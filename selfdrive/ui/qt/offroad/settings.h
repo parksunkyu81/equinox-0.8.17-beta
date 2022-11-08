@@ -338,7 +338,6 @@ public:
   }
 };
 
-
 class SRBaseControl : public AbstractControl {
   Q_OBJECT
 

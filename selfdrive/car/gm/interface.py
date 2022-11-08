@@ -41,13 +41,13 @@ class CarInterface(CarInterfaceBase):
   # Determined by iteratively plotting and minimizing error for f(angle, speed) = steer.
   @staticmethod
   def get_steer_feedforward_volt(desired_angle, v_ego):
-    ANGLE_COEF = 1.23514093
-    ANGLE_COEF2 = 2.00000000
-    ANGLE_OFFSET = 0.03891270
-    SPEED_OFFSET = 8.58272983
-    SIGMOID_COEF_RIGHT = 0.00154548
-    SIGMOID_COEF_LEFT = 0.00168327
-    SPEED_COEF = 0.16283995
+    ANGLE_COEF = 0.08617848
+    ANGLE_COEF2 = 0.21
+    ANGLE_OFFSET = 0.00205026
+    SPEED_OFFSET = -3.48009247
+    SIGMOID_COEF_RIGHT = 0.56664089
+    SIGMOID_COEF_LEFT = 0.50360594
+    SPEED_COEF = 0.55322718
     return get_steer_feedforward_sigmoid1(desired_angle, v_ego, ANGLE_COEF, ANGLE_COEF2, ANGLE_OFFSET, SPEED_OFFSET, SIGMOID_COEF_RIGHT, SIGMOID_COEF_LEFT, SPEED_COEF)
 
   @staticmethod
@@ -179,7 +179,7 @@ class CarInterface(CarInterfaceBase):
             torque_lat_accel_factor = float(Decimal(params.get("TorqueMaxLatAccel", encoding="utf8")) * Decimal('0.1')) #LAT_ACCEL_FACTOR
             torque_friction = float(Decimal(params.get("TorqueFriction", encoding="utf8")) * Decimal('0.001')) #FRICTION
 
-      #토크
+      #torque
       CarInterfaceBase.configure_torque_tune(ret.lateralTuning, torque_lat_accel_factor, torque_friction)
 
     # TODO: get actual value, for now starting with reasonable value for

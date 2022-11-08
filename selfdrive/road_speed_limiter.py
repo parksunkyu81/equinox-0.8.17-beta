@@ -1,6 +1,6 @@
+#!/usr/bin/env python3
 import json
 import os
-import random
 
 import select
 import threading
@@ -9,9 +9,10 @@ import socket
 import fcntl
 import struct
 from threading import Thread
-from cereal import messaging, log
+from cereal import messaging
 from common.numpy_fast import clip
 from common.realtime import sec_since_boot
+from common.params import Params
 from common.conversions import Conversions as CV
 
 CAMERA_SPEED_FACTOR = 0.98
@@ -243,12 +244,7 @@ def main():
 
   with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
     try:
-
-      try:
-        sock.bind(('0.0.0.0', 843))
-      except:
-        sock.bind(('0.0.0.0', Port.RECEIVE_PORT))
-
+      sock.bind(('0.0.0.0', Port.RECEIVE_PORT))
       sock.setblocking(False)
 
       while True:
@@ -277,7 +273,19 @@ def main():
       server.last_exception = e
 
 
-class RoadSpeedLimiter:
+class SpeedLimiter:
+  __instance = None
+
+  @classmethod
+  def __getInstance(cls):
+    return cls.__instance
+
+  @classmethod
+  def instance(cls):
+    cls.__instance = cls()
+    cls.instance = cls.__getInstance
+    return cls.__instance
+
   def __init__(self):
     self.slowing_down = False
     self.started_dist = 0
@@ -328,7 +336,7 @@ class RoadSpeedLimiter:
           MIN_LIMIT = 40
           MAX_LIMIT = 120
         else:
-          MIN_LIMIT = 30
+          MIN_LIMIT = 20
           MAX_LIMIT = 100
       else:
         MIN_LIMIT = 20
@@ -395,32 +403,6 @@ class RoadSpeedLimiter:
 
     self.slowing_down = False
     return 0, 0, 0, False, log
-
-
-road_speed_limiter = None
-
-
-def road_speed_limiter_get_active():
-  global road_speed_limiter
-  if road_speed_limiter is None:
-    road_speed_limiter = RoadSpeedLimiter()
-
-  return road_speed_limiter.get_active()
-
-
-def road_speed_limiter_get_max_speed(CS, v_cruise_kph):
-  global road_speed_limiter
-  if road_speed_limiter is None:
-    road_speed_limiter = RoadSpeedLimiter()
-
-  return road_speed_limiter.get_max_speed(CS, v_cruise_kph)
-
-
-def get_road_speed_limiter():
-  global road_speed_limiter
-  if road_speed_limiter is None:
-    road_speed_limiter = RoadSpeedLimiter()
-  return road_speed_limiter
 
 
 if __name__ == "__main__":

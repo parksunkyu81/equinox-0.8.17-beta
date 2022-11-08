@@ -95,15 +95,15 @@ class CarController:
         can_sends.append(gmcan.create_friction_brake_command(self.packer_ch, CanBus.CHASSIS, self.apply_brake, idx, near_stop, at_full_stop))
         CS.autoHoldActivated = True
 
-      else :
-        car_stopping = self.apply_gas < self.params.ZERO_GAS
-        standstill = CS.pcm_acc_status == AccState.STANDSTILL
-
+      else:
         if CS.pause_long_on_gas_press:
           at_full_stop = False
           near_stop = False
-
+          car_stopping = False
+          standstill = False
         else:
+          car_stopping = self.apply_gas < self.params.ZERO_GAS
+          standstill = CS.pcm_acc_status == AccState.STANDSTILL
           at_full_stop = CC.longActive and standstill and car_stopping
           near_stop = CC.longActive and (CS.out.vEgo < self.params.NEAR_STOP_BRAKE_PHASE) and car_stopping
 

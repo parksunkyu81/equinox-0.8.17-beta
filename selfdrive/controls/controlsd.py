@@ -2,6 +2,7 @@
 import os
 import math
 from typing import SupportsFloat
+import random
 
 import numpy as np
 from numbers import Number
@@ -33,10 +34,11 @@ from selfdrive.locationd.calibrationd import Calibration
 from selfdrive.hardware import HARDWARE, TICI, EON
 from selfdrive.manager.process_config import managed_processes
 from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_get
-from selfdrive.road_speed_limiter import get_road_speed_limiter, road_speed_limiter_get_active # road_speed_limiter_get_max_speed
+# from selfdrive.road_speed_limiter import get_road_speed_limiter, road_speed_limiter_get_active # road_speed_limiter_get_max_speed
 from selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import AUTO_TR_CRUISE_GAP
 from selfdrive.ntune import ntune_common_get, ntune_common_enabled, ntune_scc_get, ntune_option_enabled, ntune_option_get, ntune_torque_get
 from decimal import Decimal
+from selfdrive.road_speed_limiter import SpeedLimiter
 
 SOFT_DISABLE_TIME = 3  # seconds
 LDW_MIN_SPEED = 31 * CV.MPH_TO_MS
@@ -50,7 +52,7 @@ IGNORE_PROCESSES = {"rtshield", "uploader", "deleter", "loggerd", "logmessaged",
                     "statsd", "shutdownd"} | \
                    {k for k, v in managed_processes.items() if not v.enabled}
 
-MIN_CURVE_SPEED = 50. * CV.KPH_TO_MS
+MIN_CURVE_SPEED = 32. * CV.KPH_TO_MS
 
 ThermalStatus = log.DeviceState.ThermalStatus
 State = log.ControlsState.OpenpilotState
@@ -509,11 +511,11 @@ class Controls:
         d2y = np.gradient(dy, x)
         curv = d2y / (1 + dy ** 2) ** 1.5
 
-        start = int(interp(v_ego, [12.5, 35.], [5, TRAJECTORY_SIZE-10]))
+        start = int(interp(v_ego, [10., 27.], [10, TRAJECTORY_SIZE-10]))
         curv = curv[start:min(start + 10, TRAJECTORY_SIZE)]
-        a_y_max = 2.975 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
+        a_y_max = 2.965 - v_ego * 0.0375  # ~1.85 @ 75mph, ~2.6 @ 25mph
         v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
-        model_speed = np.mean(v_curvature) * 0.95 * ntune_scc_get("sccCurvatureFactor")
+        model_speed = np.mean(v_curvature) * 0.85 * ntune_scc_get("sccCurvatureFactor")
 
         if model_speed < v_ego:
           self.curve_speed_ms = float(max(model_speed, MIN_CURVE_SPEED))
@@ -542,9 +544,8 @@ class Controls:
         self.v_cruise_kph = 0
 
 
-    road_speed_limiter = get_road_speed_limiter()
     apply_limit_speed, road_limit_speed, left_dist, first_started, limit_log = \
-      road_speed_limiter.get_max_speed(CS, self.v_cruise_kph)
+      SpeedLimiter.instance().get_max_speed(CS, self.v_cruise_kph)
 
     if apply_limit_speed >= 20:
       self.v_cruise_kph_limit = min(apply_limit_speed, self.v_cruise_kph)
@@ -562,8 +563,7 @@ class Controls:
         self.slowing_down_alert = False
 
     else:
-      self.slowing_down_alert = False
-      self.slowing_down = False
+      self.reset()
       self.v_cruise_kph_limit = self.v_cruise_kph
 # 2 lines for Slow on Curve
     curv_speed_ms = self.cal_curve_speed(self.sm, CS.vEgo, self.sm.frame)

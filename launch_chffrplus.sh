@@ -38,7 +38,6 @@ elif [ "$(getprop persist.sys.locale)" != "ko-KR" ]; then
 
   sleep 2
   reboot
-
 else
   chmod 644 /data/openpilot/installer/boot_finish
   mount -o ro,remount /system
@@ -60,7 +59,9 @@ function two_init {
     touch /ONEPLUS
   else
     if [ ! -f /LEECO ]; then
+      mount -o remount,rw /system
       touch /LEECO
+      mount -o remount,r /system 
     fi
   fi
   neos=`cat /VERSION`

@@ -322,7 +322,6 @@ SetupWidget::SetupWidget(QWidget* parent) : QFrame(parent) {
   hide(); // Only show when first request comes back
 }
 
-
 void SetupWidget::replyFinished(const QString &response, bool success) {
   show();
   if (!success) return;
@@ -353,4 +352,3 @@ void SetupWidget::replyFinished(const QString &response, bool success) {
     }
   }
 }
-

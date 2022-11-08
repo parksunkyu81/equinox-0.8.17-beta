@@ -1813,26 +1813,6 @@ struct EncodeData {
   idx @2 :UInt32;
 }
 
-struct RoadLimitSpeed {
-    active @0 :Int16;
-    roadLimitSpeed @1 :Int16;
-    isHighway @2 :Bool;
-    camType @3 :Int16;
-    camLimitSpeedLeftDist @4 :Int16;
-    camLimitSpeed @5 :Int16;
-    sectionLimitSpeed @6 :Int16;
-    sectionLeftDist @7 :Int16;
-    camSpeedFactor @8 :Float32;
-    restArea @9 :List(RestArea);
-
-    struct RestArea {
-      image @0 :Text;
-      title @1 :Text;
-      oilPrice @2 :Text;
-      distance @3 :Text;
-    }
-}
-
 struct Event {
   logMonoTime @0 :UInt64;  # nanoseconds
   valid @67 :Bool = true;
@@ -1944,4 +1924,19 @@ struct Event {
     gpsLocationDEPRECATED @21 :GpsLocationData;
     uiLayoutStateDEPRECATED @57 :Legacy.UiLayoutState;
   }
+}
+
+struct RoadLimitSpeed {
+    active @0 :Int16;
+    roadLimitSpeed @1 :Int16;
+    isHighway @2 :Bool;
+    camType @3 :Int16;
+    camLimitSpeedLeftDist @4 :Int16;
+    camLimitSpeed @5 :Int16;
+    sectionLimitSpeed @6 :Int16;
+    sectionLeftDist @7 :Int16;
+    sectionAvgSpeed @8 :Int16;
+    sectionLeftTime @9 :Int16;
+    sectionAdjustSpeed @10 :Bool;
+    camSpeedFactor @11 :Float32;
 }
