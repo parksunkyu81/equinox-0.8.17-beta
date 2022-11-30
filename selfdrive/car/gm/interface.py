@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from typing import List
 from cereal import car, log
-from math import fabs
+from math import fabs, erf
 
 from common.numpy_fast import interp
 from common.conversions import Conversions as CV
@@ -24,6 +24,13 @@ def get_steer_feedforward_sigmoid1(angle, speed, ANGLE_COEF, ANGLE_COEF2, ANGLE_
   sigmoid = x / (1. + fabs(x))
   return ((SIGMOID_COEF_RIGHT if angle > 0. else SIGMOID_COEF_LEFT) * sigmoid) * (0.01 + speed + SPEED_OFFSET) ** ANGLE_COEF2 + ANGLE_OFFSET * (angle * SPEED_COEF - atan(angle * SPEED_COEF))
 
+# meant for torque fits
+def get_steer_feedforward_erf(angle, speed, ANGLE_COEF, ANGLE_COEF2, ANGLE_OFFSET, SPEED_OFFSET, SIGMOID_COEF_RIGHT, SIGMOID_COEF_LEFT, SPEED_COEF):
+  x = ANGLE_COEF * (angle) * (40.23 / (max(0.05,speed + SPEED_OFFSET))**SPEED_COEF)
+  sigmoid = erf(x)
+  return ((SIGMOID_COEF_RIGHT if angle < 0. else SIGMOID_COEF_LEFT) * sigmoid) + ANGLE_COEF2 * angle
+
+
 class CarInterface(CarInterfaceBase):
   def __init__(self, CP, CarController, CarState):
     super().__init__(CP, CarController, CarState)
@@ -40,7 +47,7 @@ class CarInterface(CarInterfaceBase):
 
   # Determined by iteratively plotting and minimizing error for f(angle, speed) = steer.
   @staticmethod
-  def get_steer_feedforward_volt(desired_angle, v_ego):
+  def get_steer_feedforward_volt(desired_lateral_accel, v_ego):
     ANGLE_COEF = 0.08617848
     ANGLE_COEF2 = 0.21
     ANGLE_OFFSET = 0.00205026
@@ -48,7 +55,7 @@ class CarInterface(CarInterfaceBase):
     SIGMOID_COEF_RIGHT = 0.56664089
     SIGMOID_COEF_LEFT = 0.50360594
     SPEED_COEF = 0.55322718
-    return get_steer_feedforward_sigmoid1(desired_angle, v_ego, ANGLE_COEF, ANGLE_COEF2, ANGLE_OFFSET, SPEED_OFFSET, SIGMOID_COEF_RIGHT, SIGMOID_COEF_LEFT, SPEED_COEF)
+    return get_steer_feedforward_erf(desired_lateral_accel, v_ego, ANGLE_COEF, ANGLE_COEF2, ANGLE_OFFSET, SPEED_OFFSET, SIGMOID_COEF_RIGHT, SIGMOID_COEF_LEFT, SPEED_COEF)
 
   @staticmethod
   def get_steer_feedforward_acadia(desired_angle, v_ego):
@@ -194,21 +201,21 @@ class CarInterface(CarInterfaceBase):
     ret.steerControlType = car.CarParams.SteerControlType.torque
     ret.stoppingControl = True
 
-    ret.longitudinalTuning.deadzoneBP = [0., 100.*CV.KPH_TO_MS]
-    ret.longitudinalTuning.deadzoneV = [0.0, .14]
+    ret.longitudinalTuning.deadzoneBP = [0., 9.]
+    ret.longitudinalTuning.deadzoneV = [0.0, .15]
 
-    #ret.longitudinalTuning.kpBP = [0, 10 * CV.KPH_TO_MS, 20 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
-    #ret.longitudinalTuning.kpV = [4.8, 3.5, 3.0, 1.0, 0.7, 0.5]
-    ret.longitudinalTuning.kpBP = [5., 15., 35.] # twilsonco
-    ret.longitudinalTuning.kpV = [0.9, 0.9, 0.8] #twilsonco
+    ret.longitudinalTuning.kpBP = [0, 10 * CV.KPH_TO_MS, 20 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
+    ret.longitudinalTuning.kpV = [2.4, 1.75, 1.5, .6, .4, .3]
+    #ret.longitudinalTuning.kpBP = [5., 15., 35.] # twilsonco
+    #ret.longitudinalTuning.kpV = [0.9, 0.9, 0.8] #twilsonco
     ret.longitudinalTuning.kiBP = [0, 20 * CV.KPH_TO_MS, 30 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
     ret.longitudinalTuning.kiV = [0.35, 0.53, 0.62, 0.7, 0.5, 0.36]
-    ret.longitudinalActuatorDelayLowerBound = 0.42
-    ret.longitudinalActuatorDelayUpperBound = 0.42
+    ret.longitudinalActuatorDelayLowerBound = 0.3
+    ret.longitudinalActuatorDelayUpperBound = 0.3
     ret.stopAccel = -1.7
     ret.stoppingDecelRate = 3.8
-    ret.vEgoStopping = 0.36
-    ret.vEgoStarting = 0.35
+    ret.vEgoStopping = 0.6
+    ret.vEgoStarting = 0.5
     ret.radarTimeStep = 1/15  # GM radar runs at 15Hz instead of standard 20Hz
 
     return ret
@@ -294,10 +301,6 @@ class CarInterface(CarInterfaceBase):
       # do disable on button down
       if b.type == ButtonType.cancel and b.pressed:
         events.add(EventName.buttonCancel)
-      elif ret.cruiseState.enabled and not self.CS.out.cruiseState.enabled:
-        events.add(car.CarEvent.EventName.pcmEnable)  # cruse is enabled
-      elif (not ret.cruiseState.enabled) and (ret.vEgo > 2.0 or (self.CS.out.cruiseState.enabled and (not ret.standstill))):
-        events.add(car.CarEvent.EventName.pcmDisable)  # give up, too fast to resume
 
     ret.events = events.to_msg()
 
@@ -332,10 +335,6 @@ class CarInterface(CarInterfaceBase):
       # do disable on button down
       if b.type == ButtonType.cancel and b.pressed:
         events.add(EventName.buttonCancel)
-      elif ret.cruiseState.enabled and not self.CS.out.cruiseState.enabled:
-        events.add(car.CarEvent.EventName.pcmEnable)  # cruse is enabled
-      elif (not ret.cruiseState.enabled) and (ret.vEgo > 2.0 or (self.CS.out.cruiseState.enabled and (not ret.standstill))):
-        events.add(car.CarEvent.EventName.pcmDisable)  # give up, too fast to resume
 
     ret.events = events.to_msg()
 
