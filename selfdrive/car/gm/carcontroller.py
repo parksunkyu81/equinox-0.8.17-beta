@@ -1,15 +1,20 @@
-from cereal import car, log
+from random import randint
+from common.log import Loger
+from cereal import car, log, messaging
 from common.conversions import Conversions as CV
 from common.realtime import DT_CTRL
-from common.numpy_fast import interp, clip
+from common.numpy_fast import clip, interp
 from opendbc.can.packer import CANPacker
 from selfdrive.car import apply_std_steer_torque_limits
 from selfdrive.car.gm import gmcan
+from selfdrive.car.gm.gmcan import create_buttons
 from selfdrive.car import create_gas_interceptor_command
 from selfdrive.car.gm.values import DBC, AccState, CanBus, CarControllerParams, CruiseButtons
 import cereal.messaging as messaging
 from common.params import Params
+from selfdrive.ntune import ntune_scc_get, ntune_scc_enabled
 
+LongitudinalPlanSource = log.LongitudinalPlan.LongitudinalPlanSource
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 
 class CarController:
@@ -18,6 +23,12 @@ class CarController:
     self.apply_steer_last = 0
     self.apply_gas = 0
     self.apply_brake = 0
+
+    #auto resume
+    self.resume_cnt = 0
+    self.last_lead_distance = 0
+    self.resume_wait_timer = 0
+
     self.frame = 0
     self.lka_steering_cmd_counter_last = -1 # GM: EPS fault workaround(#22404)
     self.lka_icon_status_last = (False, False)
@@ -26,16 +37,20 @@ class CarController:
     # resume
     self.params = CarControllerParams()
     self.disengage_on_gas = not Params().get_bool("DisableDisengageOnGas")
-    self.button = CruiseButtons.UNPRESS
 
+    self.stopsign_enabled = ntune_scc_enabled('StopAtStopSign')
+
+    self.sm = messaging.SubMaster(['controlsState', 'longitudinalPlan', 'radarState'])
+    self.log = Loger()
+
+    self.e2e_standstill_enable = Params().get_bool("DepartChimeAtResume")
+    self.e2e_standstill = False
+    self.e2e_standstill_stat = False
+    self.e2e_standstill_timer = 0
     self.packer = CANPacker(dbc_name)
     self.packer_pt = CANPacker(DBC[CP.carFingerprint]['pt'])
     self.packer_obj = CANPacker(DBC[CP.carFingerprint]['radar'])
     self.packer_ch = CANPacker(DBC[CP.carFingerprint]['chassis'])
-    self.sm = messaging.SubMaster(['radarState'])
-
-  def reset(self):
-    self.button = CruiseButtons.UNPRESS
 
   def update(self, CC, CS, enabled, controls):
     actuators = CC.actuators
@@ -111,8 +126,36 @@ class CarController:
         CS.autoHoldActivated = False
 
         CC.enabled = enabled
-
+        self.update_auto_resume(CC, CS, can_sends)
         can_sends.append(gmcan.create_gas_regen_command(self.packer_pt, CanBus.POWERTRAIN, self.apply_gas, idx, CC.enabled, at_full_stop))
+
+    #opkr
+    if self.e2e_standstill_enable:
+      try:
+        self.sm.update(0)
+
+        if self.e2e_standstill:
+          self.e2e_standstill_timer += 1
+          if self.e2e_standstill_timer > 500:
+            self.e2e_standstill = False
+            self.e2e_standstill_timer = 0
+        elif CS.v_Ego > 0:
+          self.e2e_standstill = False
+          self.e2e_standstill_stat = False
+          self.e2e_standstill_timer = 0
+        elif self.e2e_standstill_stat and self.sm['longitudinalPlan'].trafficState != 1 and CS.v_Ego == 0:
+          self.e2e_standstill = True
+          self.e2e_standstill_stat = False
+          self.e2e_standstill_timer = 0
+        elif self.sm['longitudinalPlan'].trafficState == 1 and self.sm['longitudinalPlan'].stopLine[12] < 10 and CS.v_Ego == 0:
+          self.e2e_standstill_timer += 1
+          if self.e2e_standstill_timer > 300:
+            self.e2e_standstill_timer = 101
+            self.e2e_standstill_stat = True
+        else:
+          self.e2e_standstill_timer = 0
+      except:
+        pass
 
     # Send dashboard UI commands (ACC status), 25hz
     if (self.frame % 4) == 0:
@@ -159,3 +202,25 @@ class CarController:
 
     self.frame += 1
     return new_actuators, can_sends
+  def update_auto_resume(self, CC, CS, can_sends):
+    # fix auto resume - by neokii
+    if CS.out.cruiseState.standstill and not CS.out.gasPressed:
+      if self.last_lead_distance == 0:
+        self.last_lead_distance = CS.lead_distance
+        self.resume_cnt = 0
+        self.resume_wait_timer = 0
+
+      elif self.resume_wait_timer > 0:
+        self.resume_wait_timer -= 1
+
+      elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
+        can_sends.append(create_buttons(self.packer_pt, CanBus.POWERTRAIN, idx, CruiseButtons.RES_ACCEL))
+        self.resume_cnt += 1
+
+        if self.resume_cnt >= randint(6, 8):
+          self.resume_cnt = 0
+          self.resume_wait_timer = randint(30, 36)
+
+    elif self.last_lead_distance != 0:
+      self.last_lead_distance = 0
+

@@ -23,7 +23,7 @@ EventName = car.CarEvent.EventName
 MAX_CTRL_SPEED = (V_CRUISE_MAX + 4) * CV.KPH_TO_MS
 ACCEL_MAX = 2.0
 ACCEL_MIN = -3.5
-FRICTION_THRESHOLD = 0.2
+FRICTION_THRESHOLD = 0.3
 
 TORQUE_PARAMS_PATH = os.path.join(BASEDIR, 'selfdrive/car/torque_data/params.yaml')
 TORQUE_OVERRIDE_PATH = os.path.join(BASEDIR, 'selfdrive/car/torque_data/override.yaml')
@@ -212,9 +212,7 @@ class CarInterfaceBase(ABC):
       events.add(EventName.wrongCarMode)
     if cs_out.espDisabled:
       events.add(EventName.espDisabled)
-    if not cs_out.cruiseState.enabled and len(events.names) and cs_out.vEgo <= gas_resume_speed:
-      events.add(EventName.pcmDisable)
-    if cs_out.gasPressed and self.disengage_on_gas:
+    if cs_out.gasPressed:
       events.add(EventName.gasPressed)
     if cs_out.stockFcw:
       events.add(EventName.stockFcw)
@@ -245,7 +243,7 @@ class CarInterfaceBase(ABC):
 
     # Disable on rising edge of gas or brake. Also disable on brake when speed > 0.
     if (self.disengage_on_gas and cs_out.gasPressed and (not self.CS.out.gasPressed) and cs_out.vEgo > gas_resume_speed) or \
-       (cs_out.brakePressed and (not self.CS.out.brakePressed) and not cs_out.standstill):
+       (cs_out.brakePressed and (not self.CS.out.brakePressed or not cs_out.standstill)):
       events.add(EventName.pedalPressed)
 
     # we engage when pcm is active (rising edge)
@@ -260,6 +258,7 @@ class CarInterfaceBase(ABC):
 
 class RadarInterfaceBase(ABC):
   def __init__(self, CP):
+    self.rcp = None #apilot
     self.pts = {}
     self.delay = 0
     self.radar_ts = CP.radarTimeStep
@@ -291,13 +290,25 @@ class CarStateBase(ABC):
     self.v_ego_kf = KF1D(x0=[[0.0], [0.0]],
                          A=[[1.0, DT_CTRL], [0.0, 1.0]],
                          C=[1.0, 0.0],
-                         K=[[0.12287673], [0.29666309]])
+                         K=[[0.17406039], [1.65925647]]) #ajouatom
+
+    self.v_ego_clu_kf = KF1D(x0=[[0.0], [0.0]],
+                         A=[[1.0, DT_CTRL], [0.0, 1.0]],
+                         C=[1.0, 0.0],
+                         K=[[0.17406039], [1.65925647]]) #ajouatom
 
   def update_speed_kf(self, v_ego_raw):
     if abs(v_ego_raw - self.v_ego_kf.x[0][0]) > 2.0:  # Prevent large accelerations when car starts at non zero speed
       self.v_ego_kf.x = [[v_ego_raw], [0.0]]
 
     v_ego_x = self.v_ego_kf.update(v_ego_raw)
+    return float(v_ego_x[0]), float(v_ego_x[1])
+
+  def update_clu_speed_kf(self, v_ego_raw):
+    if abs(v_ego_raw - self.v_ego_clu_kf.x[0][0]) > 2.0:  # Prevent large accelerations when car starts at non zero speed
+      self.v_ego_clu_kf.x = [[v_ego_raw], [0.0]]
+
+    v_ego_x = self.v_ego_clu_kf.update(v_ego_raw)
     return float(v_ego_x[0]), float(v_ego_x[1])
 
   def get_wheel_speeds(self, fl, fr, rl, rr, unit=CV.KPH_TO_MS):
