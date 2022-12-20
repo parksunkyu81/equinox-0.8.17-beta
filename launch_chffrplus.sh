@@ -165,27 +165,44 @@ function two_init {
   fi
 
   if [ ! -f "/data/ntune/common.json" ]; then
+    mount -o remount,rw /system
     mkdir /data/ntune
+    mount -o remount,r /system
   fi
 
   if [ ! -f "/data/ntune/lat_torque_v4.json" ]; then
+    mount -o remount,rw /system
     cp /data/openpilot/ntune/lat_torque_v4.json /data/ntune/lat_torque_v4.json
+    chmod 666 /data/ntune/lat_torque_v4.json
+    mount -o remount,r /system
   fi
 
   if [ ! -f "/data/ntune/common.json" ]; then
+    mount -o remount,rw /system
     cp /data/openpilot/ntune/common.json /data/ntune/common.json
+    chmod 666 /data/ntune/common.json
+    mount -o remount,r /system
   fi
 
   if [ ! -f "/data/ntune/scc.json" ]; then
+    mount -o remount,rw /system
     cp /data/openpilot/ntune/scc.json /data/ntune/scc.json
+    chmod 666 /data/ntune/scc.json
+    mount -o remount,r /system
   fi
 
   if [ ! -f "/data/ntune/option.json" ]; then
+    mount -o remount,rw /system
     cp /data/openpilot/ntune/option.json /data/ntune/option.json
+    chmod 666 /data/ntune/option.json
+    mount -o remount,r /system
   fi
 
   if [ ! -f "/data/ntune/lat_lqr.json" ]; then
+    mount -o remount,rw /system
     cp /data/openpilot/ntune/lat_lqr.json /data/ntune/lat_lqr.json
+    chmod 666 /data/ntune/lat_lqr.json
+    mount -o remount,r /system
   fi
 }
 

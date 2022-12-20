@@ -42,8 +42,11 @@ def manager_init() -> None:
     ("HasAcceptedTerms", "0"),
     ("OpenpilotEnabledToggle", "1"),
     ("IsMetric", "1"),
+
+    # HKG
     ("LateralControl", "TORQUE"),
-    ("LongControlEnabled", "0"),
+    ("UseClusterSpeed", "1"),
+    ("LongControlEnabled", "1"),
     ("DisableOpFcw", "1"),
     ("DisableUpdates", "1"),
     ("DisableDisengageOnGas", "0"),
@@ -74,9 +77,15 @@ def manager_init() -> None:
     ("IsLowSpeedFactor", "1"),
     ("OPKRServer", "0"),
     ("UseBaseTorqueValues", "1"),
+    ("StopAtStopSign", "0"),
+    ("DepartChimeAtResume", "0"),
 
     #nPilot_Manager
     ("UseNpilotManager", "0"),
+    #sunny Speed Control
+    ("TurnVisionControl", "0"),
+
+    ("ShowTrafficSignal", "1"),
 
 
   ]

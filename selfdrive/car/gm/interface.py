@@ -11,7 +11,10 @@ from selfdrive.car.gm.values import CAR, Ecu, ECU_FINGERPRINT, CruiseButtons, \
 from selfdrive.car.interfaces import CarInterfaceBase
 from common.params import Params
 from decimal import Decimal
-from selfdrive.ntune import ntune_common_get, ntune_lqr_get, ntune_torque_get
+from selfdrive.ntune import ntune_common_get, ntune_lqr_get, ntune_torque_get, ntune_scc_get
+from selfdrive.car.isotp_parallel_query import IsoTpParallelQuery
+from common.log import Loger
+from selfdrive.car.disable_ecu import enable_radar_tracks, disable_ecu
 
 GearShifter = car.CarState.GearShifter
 EventName = car.CarEvent.EventName
@@ -42,8 +45,8 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
-    params = CarControllerParams()
-    return params.ACCEL_MIN, params.ACCEL_MAX
+    _params = CarControllerParams()
+    return _params.ACCEL_MIN, params.ACCEL_MAX
 
   # Determined by iteratively plotting and minimizing error for f(angle, speed) = steer.
   @staticmethod
@@ -88,11 +91,11 @@ class CarInterface(CarInterfaceBase):
     # or camera is on powertrain bus (LKA cars without ACC).
     # for white panda
     # ret.enableGasInterceptor = 0x201 in fingerprint[0]
-    ret.enableGasInterceptor = 512 in fingerprint[0]
+    # ret.enableGasInterceptor = 512 in fingerprint[0]
     ret.enableCamera = is_ecu_disconnected(fingerprint[0], FINGERPRINTS, ECU_FINGERPRINT, candidate, Ecu.fwdCamera)
-    ret.openpilotLongitudinalControl = (Params().get_bool('LongControlEnabled') and ret.enableCamera) or ret.enableGasInterceptor
-
+    ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or ret.enableCamera # or ret.enableGasInterceptor
     tire_stiffness_factor = 0.469
+
     # for autohold on ui icon
     ret.enableAutoHold = 241 in fingerprint[0]
 
@@ -101,9 +104,8 @@ class CarInterface(CarInterfaceBase):
     ret.minEnableSpeed = -1
     ret.mass = 1607. + STD_CARGO_KG
     ret.wheelbase = 2.69
-    ret.steerRatio = 17.7
-    # ret.steerRateCost = 0.23
-    ret.steerActuatorDelay = 0.225  # Default delay, not measured yet
+    ret.steerRatio = 16.7
+    ret.steerActuatorDelay = 0.22  # Default delay, not measured yet
     ret.steerRatioRear = 0.
     ret.centerToFront = ret.wheelbase * 0.49 # wild guess
 
@@ -145,16 +147,8 @@ class CarInterface(CarInterfaceBase):
 
     elif lateral_control == 'TORQUE':
       ret.lateralTuning.init('torque')
+
     params = Params()
-    if params.get_bool("UseNpilotManager"):
-      ret.steerActuatorDelay = max(ntune_common_get('steerActuatorDelay'), 0.1)
-      ret.steerLimitTimer = max(ntune_common_get('steerLimitTimer'), 3.0)
-    else:
-      ret.steerActuatorDelay = float(Decimal(params.get("SteerActuatorDelayAdj", encoding="utf8")) * Decimal('0.01'))
-      ret.steerLimitTimer = float(Decimal(params.get("SteerLimitTimerAdj", encoding="utf8")) * Decimal('0.01'))
-
-
-
 
     if params.get_bool("UseNpilotManager"):
       ret.steerRatio = max(ntune_common_get('steerRatio'), 12.0)
@@ -163,7 +157,6 @@ class CarInterface(CarInterfaceBase):
         ret.steerRatio = float(Decimal(params.get("SteerRatioAdj", encoding="utf8")) * Decimal('0.01'))
 
     if ret.lateralTuning.which() == 'torque':
-
       if params.get_bool("UseNpilotManager"):
         try:
           torque_lat_accel_factor = ntune_torque_get('latAccelFactor') #LAT_ACCEL_FACTOR
@@ -212,10 +205,19 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.kiV = [0.35, 0.53, 0.62, 0.7, 0.5, 0.36]
     ret.longitudinalActuatorDelayLowerBound = 0.3
     ret.longitudinalActuatorDelayUpperBound = 0.3
-    ret.stopAccel = -1.7
-    ret.stoppingDecelRate = 3.8
-    ret.vEgoStopping = 0.6
-    ret.vEgoStarting = 0.5
+
+    ret.stopAccel = min(ntune_scc_get('stopAccel'), -2.0)
+    ret.stoppingDecelRate = max(ntune_scc_get('stoppingDecelRate'), 3.0) #0.4  # brake_travel/s while trying to stop
+    ret.vEgoStopping = max(ntune_scc_get('vEgoStopping'), 0.3) #0.5
+    ret.vEgoStarting = max(ntune_scc_get('vEgoStarting'), 0.25) #0.5 # needs to be >= vEgoStopping to avoid state transition oscillation
+
+    if params.get_bool("UseNpilotManager"):
+      ret.steerActuatorDelay = max(ntune_common_get('steerActuatorDelay'), 0.1)
+      ret.steerLimitTimer = max(ntune_common_get('steerLimitTimer'), 3.0)
+    else:
+      ret.steerActuatorDelay = float(Decimal(params.get("SteerActuatorDelayAdj", encoding="utf8")) * Decimal('0.01'))
+      ret.steerLimitTimer = float(Decimal(params.get("SteerLimitTimerAdj", encoding="utf8")) * Decimal('0.01'))
+
     ret.radarTimeStep = 1/15  # GM radar runs at 15Hz instead of standard 20Hz
 
     return ret
@@ -289,6 +291,9 @@ class CarInterface(CarInterfaceBase):
     if self.CS.autoHoldActivated:
       events.add(car.CarEvent.EventName.autoHoldActivated)
 
+    #opkr
+    if self.CC.e2e_standstill:
+      events.add(EventName.chimeAtResume)  
     # handle button presses
     for b in ret.buttonEvents:
       # do enable on both accel(or resume) and decel buttons
