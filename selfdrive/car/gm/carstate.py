@@ -26,6 +26,8 @@ class CarState(CarStateBase):
     self.a_ego_filtered_rc = 1.0
     self.a_ego_filtered = FirstOrderFilter(0.0, self.a_ego_filtered_rc, DT_CTRL)
 
+    self.gas_pressed = False
+    self.cruiseState_enabled = False
     self.cruise_buttons = False
     self.prev_cruise_buttons = False
     self.vEgo = 0
@@ -50,14 +52,15 @@ class CarState(CarStateBase):
     #Engine Rpm
     self.engineRPM = 0
 
-    self.vEgo = 0.
     self.use_cluster_speed = Params().get_bool('UseClusterSpeed')
-
+    self.long_control_enabled = Params().get_bool('LongControlEnabled')
+    self.is_metric = False
     self.pause_long_on_gas_press = False
     self.gasPressed = False
 
     # lead_distance
     self.lead_distance = 0
+    self.lead_speed = 0
     self.sm = messaging.SubMaster(['radarState'])
 
 
@@ -66,26 +69,32 @@ class CarState(CarStateBase):
     self.sm.update(0)
     if self.sm.updated['radarState']:
       self.lead_distance = 0
+      self.lead_speed = 0
       lead = self.sm['radarState'].leadOne
       if lead is not None:
         self.lead_distance = lead.dRel
+        self.lead_speed = lead.vLead
 
     ret = car.CarState.new_message()
     self.prev_cruise_buttons = self.cruise_buttons
     self.cruise_buttons = pt_cp.vl["ASCMSteeringButton"]["ACCButtons"]
     self.prev_left_blinker = self.leftBlinker
     self.prev_right_blinker = self.rightBlinker
-# 4 lines for 3Bar Distance
+
+    self.is_metric = Params().get_bool("IsMetric")
+    self.speed_conv_to_ms = CV.KPH_TO_MS * 1.609344 if self.is_metric else CV.MPH_TO_MS
+
+    # 4 lines for 3Bar Distance
     self.prev_lka_button = self.lka_button
     self.lka_button = pt_cp.vl["ASCMSteeringButton"]["LKAButton"]
+    self.prev_distance_button = self.distance_button
+    self.distance_button = pt_cp.vl["ASCMSteeringButton"]["DistanceButton"]
 
     cluSpeed = pt_cp.vl["ECMVehicleSpeed"]["VehicleSpeed"]
     self.v_Ego = pt_cp.vl["ECMVehicleSpeed"]["VehicleSpeed"]
 
-    ret.cluSpeedMs = cluSpeed * CV.MPH_TO_MS
+    ret.cluSpeedMs = cluSpeed * self.speed_conv_to_ms
 
-    self.prev_distance_button = self.distance_button
-    self.distance_button = pt_cp.vl["ASCMSteeringButton"]["DistanceButton"]
 
     ret.wheelSpeeds = self.get_wheel_speeds(
       pt_cp.vl["EBCMWheelSpdFront"]["FLWheelSpd"],
@@ -94,7 +103,7 @@ class CarState(CarStateBase):
       pt_cp.vl["EBCMWheelSpdRear"]["RRWheelSpd"],
     )
 
-    vEgoRawClu = cluSpeed * CV.MPH_TO_MS
+    vEgoRawClu = cluSpeed * self.speed_conv_to_ms
     vEgoClu, aEgoClu = self.update_clu_speed_kf(vEgoRawClu)
 
     vEgoRawWheel = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
@@ -109,6 +118,8 @@ class CarState(CarStateBase):
       ret.vEgoRaw = vEgoRawWheel
       ret.vEgo = vEgoWheel
       ret.aEgo = aEgoWheel
+
+    ret.vCluRatio = (vEgoWheel / vEgoClu) if (vEgoClu > 3. and vEgoWheel > 3.) else 1.0
 
     # ret.vEgoRaw = mean([ret.wheelSpeeds.fl, ret.wheelSpeeds.fr, ret.wheelSpeeds.rl, ret.wheelSpeeds.rr]) * (106./100.)
     # ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
@@ -173,9 +184,11 @@ class CarState(CarStateBase):
       ret.brakePressed = ret.brakePressed or self.regenPaddlePressed
 
     # cruise state
+    self.gas_pressed = ret.gasPressed
     ret.cruiseState.enabled = self.pcm_acc_status != AccState.OFF
     ret.cruiseState.standstill = False
     ret.cruiseState.enabledAcc = ret.cruiseState.enabled
+    self.cruiseState_enabled = ret.cruiseState.enabled
 
     # bellow 1 line for AutoHold
     self.cruiseMain = ret.cruiseState.available

@@ -34,10 +34,11 @@ class CarController:
     self.lka_icon_status_last = (False, False)
     self.steer_rate_limited = False
 
-    # resume
+    # DisableDisengageOnGas
     self.params = CarControllerParams()
     self.disengage_on_gas = not Params().get_bool("DisableDisengageOnGas")
 
+    # stop at Stopsignal
     self.stopsign_enabled = ntune_scc_enabled('StopAtStopSign')
 
     self.sm = messaging.SubMaster(['controlsState', 'longitudinalPlan', 'radarState'])
@@ -202,25 +203,26 @@ class CarController:
 
     self.frame += 1
     return new_actuators, can_sends
+
   def update_auto_resume(self, CC, CS, can_sends):
-    # fix auto resume - by neokii
-    if CS.out.cruiseState.standstill and not CS.out.gasPressed:
-      if self.last_lead_distance == 0:
-        self.last_lead_distance = CS.lead_distance
-        self.resume_cnt = 0
-        self.resume_wait_timer = 0
-
-      elif self.resume_wait_timer > 0:
-        self.resume_wait_timer -= 1
-
-      elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
-        can_sends.append(create_buttons(self.packer_pt, CanBus.POWERTRAIN, idx, CruiseButtons.RES_ACCEL))
-        self.resume_cnt += 1
-
-        if self.resume_cnt >= randint(6, 8):
+    if (self.frame % 4) == 0:
+      idx = (self.frame // 4) % 4
+      if CS.out.standstill and not CS.out.gasPressed:
+        if self.last_lead_distance == 0:
+          self.last_lead_distance = CS.lead_distance
           self.resume_cnt = 0
-          self.resume_wait_timer = randint(30, 36)
+          self.resume_wait_timer = 0
 
-    elif self.last_lead_distance != 0:
-      self.last_lead_distance = 0
+        elif self.resume_wait_timer > 0:
+          self.resume_wait_timer -= 1
 
+        elif abs(CS.lead_distance - self.last_lead_distance) > 0.1:
+          can_sends.append(create_buttons(self.packer_pt, CanBus.POWERTRAIN, idx, CruiseButtons.RES_ACCEL))
+          self.resume_cnt += 1
+
+          if self.resume_cnt >= randint(6, 8):
+            self.resume_cnt = 0
+            self.resume_wait_timer = randint(30, 36)
+
+      elif self.last_lead_distance != 0:
+        self.last_lead_distance = 0
