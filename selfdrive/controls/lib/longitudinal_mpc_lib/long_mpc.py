@@ -35,7 +35,7 @@ COST_E_DIM = 5
 COST_DIM = COST_E_DIM + 1
 CONSTR_DIM = 4
 
-X_EGO_OBSTACLE_COST = 6.#3.
+X_EGO_OBSTACLE_COST = 8. #3.
 X_EGO_COST = 0.
 V_EGO_COST = 0.
 A_EGO_COST = 0.
@@ -71,8 +71,8 @@ MIN_ACCEL = -3.5
 MAX_ACCEL = 2.0
 T_FOLLOW = 1.45
 
-COMFORT_BRAKE = max(ntune_scc_get("COMFORT_BRAKE"), 2.0) #2.5
-STOP_DISTANCE = max(ntune_scc_get("STOP_DISTANCE"), 5.5) #6.0
+COMFORT_BRAKE = max(ntune_scc_get("COMFORT_BRAKE"), 2.5) #2.5
+STOP_DISTANCE = max(ntune_scc_get("STOP_DISTANCE"), 6.0) #6.0
 
 def get_stopped_equivalence_factor(v_lead):
   return (v_lead**2) / (2 * COMFORT_BRAKE)
@@ -218,11 +218,11 @@ class LongitudinalMpc:
   def __init__(self, mode='acc'):
     self.mode = mode
     self.trafficState = 0
-    self.XEgoObstacleCost = 6. #3 증가할수록 정지선정지가 정확해지나, 급감속이 강해집니다
+    self.XEgoObstacleCost = 8. #3 증가할수록 정지선정지가 정확해지나, 급감속이 강해집니다
     self.JEgoCost = 5.
-    self.AChangeCost = 80. #neokii 50 적으면 선행차에 대한 반응이 강해집니다
+    self.AChangeCost = 20. #neokii 50 적으면 선행차에 대한 반응이 강해집니다
     self.DangerZoneCost = 100.
-    self.trafficStopDistanceAdjust = 5.5 #신호정지 위치 조정
+    self.trafficStopDistanceAdjust = 1.5 #신호정지 위치 조정
     self.trafficStopAccel = 1.
     self.trafficStopModelSpeed = False
     self.e2eDecelSpeed = 0
@@ -410,7 +410,7 @@ class LongitudinalMpc:
         #1단계: 모델값을 이용한 신호감지
         startSign = v[-1] > 5.0 or v[-1] > (v[0]+2)
         # stopSign = v_ego_kph < 80.0 and ((v[-1] < 3.0) or (v[-1] < v[0]*0.70)) and abs(y[N]) < 3.0 #직선도로에서만 감지하도록 함~ 모델속도가 70% 감소할때만..
-        stopSign = model.stopLine.prob > 0.5
+        stopSign = model.stopLine.prob > 0.2
         
         if startSign:
           self.startSignCount = self.startSignCount + 1 #모델은 0.05초  /1 frame

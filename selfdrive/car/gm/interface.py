@@ -95,6 +95,7 @@ class CarInterface(CarInterfaceBase):
     ret.enableCamera = is_ecu_disconnected(fingerprint[0], FINGERPRINTS, ECU_FINGERPRINT, candidate, Ecu.fwdCamera)
     ret.openpilotLongitudinalControl = Params().get_bool('LongControlEnabled') or ret.enableCamera # or ret.enableGasInterceptor
     tire_stiffness_factor = 0.469
+    ret.maxSteeringAngleDeg = 90.
 
     # for autohold on ui icon
     ret.enableAutoHold = 241 in fingerprint[0]
@@ -141,6 +142,7 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
         ret.lateralTuning.pid.kiV, ret.lateralTuning.pid.kpV = [[0.0175], [0.185]]
         ret.lateralTuning.pid.kf = 1. # get_steer_feedforward_volt()
+        ret.maxSteeringAngleDeg = 90.
         # D gain
         ret.lateralTuning.pid.kdBP = [0., 15., 33.]
         ret.lateralTuning.pid.kdV = [0.49, 0.65, 0.725]  #corolla from shane fork : 0.725
@@ -151,7 +153,7 @@ class CarInterface(CarInterfaceBase):
     params = Params()
 
     if params.get_bool("UseNpilotManager"):
-      ret.steerRatio = max(ntune_common_get('steerRatio'), 12.0)
+      ret.steerRatio = max(ntune_common_get('steerRatio'), 16.5)
     else:
       if not params.get_bool("UseBaseTorqueValues"):
         ret.steerRatio = float(Decimal(params.get("SteerRatioAdj", encoding="utf8")) * Decimal('0.01'))
@@ -198,7 +200,7 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.deadzoneV = [0.0, .15]
 
     ret.longitudinalTuning.kpBP = [0, 10 * CV.KPH_TO_MS, 20 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kpV = [2.4, 1.75, 1.5, .6, .4, .3]
+    ret.longitudinalTuning.kpV = [2.4, 1.5, 1., .6, .4, .3]
     #ret.longitudinalTuning.kpBP = [5., 15., 35.] # twilsonco
     #ret.longitudinalTuning.kpV = [0.9, 0.9, 0.8] #twilsonco
     ret.longitudinalTuning.kiBP = [0, 20 * CV.KPH_TO_MS, 30 * CV.KPH_TO_MS, 50 * CV.KPH_TO_MS, 70 * CV.KPH_TO_MS, 120 * CV.KPH_TO_MS]
@@ -208,11 +210,11 @@ class CarInterface(CarInterfaceBase):
 
     ret.stopAccel = min(ntune_scc_get('stopAccel'), -2.0)
     ret.stoppingDecelRate = max(ntune_scc_get('stoppingDecelRate'), 3.0) #0.4  # brake_travel/s while trying to stop
-    ret.vEgoStopping = max(ntune_scc_get('vEgoStopping'), 0.3) #0.5
-    ret.vEgoStarting = max(ntune_scc_get('vEgoStarting'), 0.25) #0.5 # needs to be >= vEgoStopping to avoid state transition oscillation
+    ret.vEgoStopping = max(ntune_scc_get('vEgoStopping'), 0.6) #0.5
+    ret.vEgoStarting = max(ntune_scc_get('vEgoStarting'), 0.3) #0.5 # needs to be >= vEgoStopping to avoid state transition oscillation
 
     if params.get_bool("UseNpilotManager"):
-      ret.steerActuatorDelay = max(ntune_common_get('steerActuatorDelay'), 0.1)
+      ret.steerActuatorDelay = max(ntune_common_get('steerActuatorDelay'), 0.22)
       ret.steerLimitTimer = max(ntune_common_get('steerLimitTimer'), 3.0)
     else:
       ret.steerActuatorDelay = float(Decimal(params.get("SteerActuatorDelayAdj", encoding="utf8")) * Decimal('0.01'))

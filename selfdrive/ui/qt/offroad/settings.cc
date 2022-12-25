@@ -1924,6 +1924,8 @@ CTorqueControlGroup::CTorqueControlGroup() : CGroupWidget( tr("Torque Control Op
   QVBoxLayout *pBoxLayout = CreateBoxLayout();
 
   pBoxLayout->addWidget(new SRBaseControl());
+  pBoxLayout->addWidget(new SRMaxControl());
+  pBoxLayout->addWidget(new LiveSteerRatioToggle());
   pBoxLayout->addWidget(new TorqueMaxLatAccel());
   pBoxLayout->addWidget(new TorqueFriction());
   pBoxLayout->addWidget(new UseLiveTorqueToggle());

@@ -216,7 +216,7 @@ class Controls:
 
     #opkr
     self.second = 0.0
-    self.steerRatio_Max = float(Decimal(params.get("SteerRatioMaxAdj", encoding="utf8")) * Decimal('0.01'))
+    self.steerRatio_Max = float(Decimal(params.get("SteerRatioMaxAdj", encoding="utf8")) * Decimal('0.1'))
     self.new_steerRatio = self.CP.steerRatio
     self.steerRatio_to_send = 0
     self.live_sr = params.get_bool("OpkrLiveSteerRatio")
@@ -743,7 +743,8 @@ class Controls:
     CC.enabled = self.enabled
     # Check which actuators can be enabled
     CC.latActive = self.active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
-                     CS.vEgo > self.CP.minSteerSpeed and not CS.standstill
+                     CS.vEgo > self.CP.minSteerSpeed and not CS.standstill \
+                   and abs(CS.steeringAngleDeg) < self.CP.maxSteeringAngleDeg
     CC.longActive = self.active and not self.events.any(ET.OVERRIDE)
 
     actuators = CC.actuators
