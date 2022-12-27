@@ -263,13 +263,13 @@ class Controls:
       return
 
     # Disable on rising edge of accelerator or brake. Also disable on brake when speed > 0
-    if (self.disengage_on_gas and CS.gasPressed and (not self.CS_prev.gasPressed) and CS.vEgo > -1) or \
-         (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)):
-      self.events.add(EventName.pedalPressed)
+    #if (self.disengage_on_gas and CS.gasPressed and (not self.CS_prev.gasPressed) and CS.vEgo > -1) or \
+    #     (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)):
+    #  self.events.add(EventName.pedalPressed)
 	# TODO : check this line. jc01rho.
-    if CS.gasPressed:
-      self.events.add(EventName.pedalPressedPreEnable if self.disengage_on_gas else
-                      EventName.gasPressedOverride)
+    #if CS.gasPressed:
+    #  self.events.add(EventName.pedalPressedPreEnable if self.disengage_on_gas else
+    #                  EventName.gasPressedOverride)
 
     self.events.add_from_msg(CS.events)
 
@@ -442,9 +442,9 @@ class Controls:
       v_future = speeds[-1]
     else:
       v_future = 100.0
-    if CS.brakePressed and v_future >= self.CP.vEgoStarting \
-      and self.CP.openpilotLongitudinalControl and CS.vEgo < 0.3:
-      self.events.add(EventName.noTarget)
+    #if CS.brakePressed and v_future >= self.CP.vEgoStarting \
+    #  and self.CP.openpilotLongitudinalControl and CS.vEgo < 0.3:
+    #  self.events.add(EventName.noTarget)
 
     # events for roadSpeedLimiter
     if self.slowing_down_sound_alert:
@@ -535,11 +535,13 @@ class Controls:
     # if stock cruise is completely disabled, then we can use our own set speed logic
     if not self.CP.pcmCruise:
       self.v_cruise_kph = update_v_cruise(self.v_cruise_kph, CS.vEgo, CS.gasPressed, CS.buttonEvents, self.button_timers, self.enabled, self.is_metric)
-    else:
-      if CS.cruiseState.available:
-        self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
-      else:
-        self.v_cruise_kph = 0
+    elif CS.cruiseState.enabled:
+      self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+    #else:
+    #  if CS.cruiseState.available:
+    #    self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+    #  else:
+    #    self.v_cruise_kph = 0
 
     #visionTurnControl	
     vtcState = self.sm['longitudinalPlan'].visionTurnControllerState
