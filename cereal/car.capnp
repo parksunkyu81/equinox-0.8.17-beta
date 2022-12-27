@@ -232,6 +232,11 @@ struct CarState {
   cluSpeedMs @45 :Float32;
   vCluRatio @46 :Float32;
 
+  # PSK
+  lkasEnable @47 :Bool;
+  adaptiveCruise @48 :Bool;
+  mainOn @49 :Bool;
+
   struct WheelSpeeds {
     # optional wheel speeds
     fl @0 :Float32;
@@ -436,7 +441,7 @@ struct CarControl {
   gasDEPRECATED @1 :Float32;
   brakeDEPRECATED @2 :Float32;
   steeringTorqueDEPRECATED @3 :Float32;
-  activeDEPRECATED @7 :Bool;
+  active @7 :Bool;
   rollDEPRECATED @8 :Float32;
   pitchDEPRECATED @9 :Float32;
 }

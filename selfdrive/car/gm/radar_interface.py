@@ -11,7 +11,7 @@ SLOT_1_MSG = RADAR_HEADER_MSG + 1
 NUM_SLOTS = 20
 
 # Actually it's 0x47f, but can parser only reports
-# messages that are present in DBC 
+# messages that are present in DBC
 LAST_RADAR_MSG = RADAR_HEADER_MSG + NUM_SLOTS
 
 

@@ -1,12 +1,5 @@
 from selfdrive.car import make_can_msg
 
-def create_buttons(packer, bus, idx, button):
-  values = {
-    "ACCButtons": button,
-    "RollingCounter": idx,
-  }
-  return packer.make_can_msg("ASCMSteeringButton", bus, values)
-
 def create_steering_control(packer, bus, apply_steer, idx, lkas_active):
 
   values = {
@@ -47,10 +40,6 @@ def create_friction_brake_command(packer, bus, apply_brake, idx, near_stop, at_f
     mode = 0xa
     if at_full_stop:
       mode = 0xd
-  if near_stop:
-    mode = 0xb
-  if at_full_stop:
-    mode = 0xd
 
     # TODO: this is to have GM bringing the car to complete stop,
     # but currently it conflicts with OP controls, so turned off.
@@ -69,7 +58,7 @@ def create_friction_brake_command(packer, bus, apply_brake, idx, near_stop, at_f
 
   return packer.make_can_msg("EBCMFrictionBrakeCmd", bus, values)
 
-def create_acc_dashboard_command(packer, bus, acc_engaged, target_speed_kph, lead_car_in_sight, fcw, follow_level):
+def create_acc_dashboard_command(packer, bus, acc_engaged, target_speed_kph, lead_car_in_sight, fcw):
   # Not a bit shift, dash can round up based on low 4 bits.
   target_speed = int(target_speed_kph * 16) & 0xfff
 
@@ -77,7 +66,7 @@ def create_acc_dashboard_command(packer, bus, acc_engaged, target_speed_kph, lea
     "ACCAlwaysOne" : 1,
     "ACCResumeButton" : 0,
     "ACCSpeedSetpoint" : target_speed,
-    "ACCGapLevel" : follow_level,
+    "ACCGapLevel" : 3 * acc_engaged,  # 3 "far", 0 "inactive"
     "ACCCmdActive" : acc_engaged,
     "ACCAlwaysOne2" : 1,
     "ACCLeadCar" : lead_car_in_sight,
