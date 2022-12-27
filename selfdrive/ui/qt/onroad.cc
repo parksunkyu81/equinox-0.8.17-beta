@@ -941,13 +941,13 @@ void NvgWindow::drawBottomIcons(QPainter &p) {
   drawIcon(p, x, y, ic_brake, QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
 
   // auto hold
-  bool autohold_valid = car_state.getAutoHoldActivated();
+  /*bool autohold_valid = car_state.getAutoHoldActivated();
   x = radius / 2 + (bdr_s * 2) + (radius + 50) * 3;
   img_alpha = autohold_valid ? 1.0f : 0.15f;
   bg_alpha = autohold_valid ? 0.3f : 0.1f;
   drawIcon(p, x, y, ic_autohold_active,
           QColor(0, 0, 0, (255 * bg_alpha)), img_alpha);
-  p.setOpacity(1.);
+  p.setOpacity(1.);*/
 }
 
 void NvgWindow::drawSpeed(QPainter &p) {

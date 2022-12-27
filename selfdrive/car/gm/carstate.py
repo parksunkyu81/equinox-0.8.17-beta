@@ -89,7 +89,7 @@ class CarState(CarStateBase):
     #TODO: JJS: Add hasEPB to cereal and use detection rather than hard coding...
     #if self.CP.hasEPB:
     self.park_brake = pt_cp.vl["EPBStatus"]["EPBClosed"]
-    ret.autoHold = pt_cp.vl["EPBStatus"]["EPBClosed"]
+    #ret.autoHold = pt_cp.vl["EPBStatus"]["EPBClosed"]
 
     ret.cruiseState.available = pt_cp.vl["ECMEngineStatus"]["CruiseMainOn"] != 0
 
