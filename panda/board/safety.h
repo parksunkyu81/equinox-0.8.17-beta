@@ -2,30 +2,30 @@
 
 // include the safety policies.
 #include "safety/safety_defaults.h"
-#include "safety/safety_honda.h"
-#include "safety/safety_toyota.h"
-#include "safety/safety_tesla.h"
+//#include "safety/safety_honda.h"
+//#include "safety/safety_toyota.h"
+//#include "safety/safety_tesla.h"
 #include "safety/safety_gm.h"
-#include "safety/safety_ford.h"
-#include "safety/safety_hyundai.h"
+//#include "safety/safety_ford.h"
+//#include "safety/safety_hyundai.h"
 #include "safety/safety_chrysler.h"
-#include "safety/safety_subaru.h"
-#include "safety/safety_mazda.h"
-#include "safety/safety_nissan.h"
-#include "safety/safety_volkswagen_mqb.h"
+//#include "safety/safety_subaru.h"
+//#include "safety/safety_mazda.h"
+//#include "safety/safety_nissan.h"
+//#include "safety/safety_volkswagen_mqb.h"
 #include "safety/safety_volkswagen_pq.h"
 #include "safety/safety_elm327.h"
-#include "safety/safety_body.h"
+//#include "safety/safety_hyundai_community.h"
 
 // from cereal.car.CarParams.SafetyModel
 #define SAFETY_SILENT 0U
-#define SAFETY_HONDA_NIDEC 1U
+//#define SAFETY_HONDA_NIDEC 1U
 #define SAFETY_TOYOTA 2U
 #define SAFETY_ELM327 3U
 #define SAFETY_GM 4U
-#define SAFETY_HONDA_BOSCH_GIRAFFE 5U
+//#define SAFETY_HONDA_BOSCH_GIRAFFE 5U
 #define SAFETY_FORD 6U
-#define SAFETY_HYUNDAI 8U
+//#define SAFETY_HYUNDAI 8U
 #define SAFETY_CHRYSLER 9U
 #define SAFETY_TESLA 10U
 #define SAFETY_SUBARU 11U
@@ -35,11 +35,11 @@
 #define SAFETY_ALLOUTPUT 17U
 #define SAFETY_GM_ASCM 18U
 #define SAFETY_NOOUTPUT 19U
-#define SAFETY_HONDA_BOSCH 20U
+//#define SAFETY_HONDA_BOSCH 20U
 #define SAFETY_VOLKSWAGEN_PQ 21U
 #define SAFETY_SUBARU_LEGACY 22U
-#define SAFETY_HYUNDAI_LEGACY 23U
-#define SAFETY_HYUNDAI_COMMUNITY 24U
+//#define SAFETY_HYUNDAI_LEGACY 23U
+//#define SAFETY_HYUNDAI_COMMUNITY 24U
 #define SAFETY_STELLANTIS 25U
 #define SAFETY_FAW 26U
 #define SAFETY_BODY 27U
@@ -66,7 +66,7 @@ int safety_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 }
 
 bool get_longitudinal_allowed(void) {
-  return controls_allowed || gas_pressed_prev;
+  return controls_allowed && !gas_pressed_prev;
 }
 
 // Given a CRC-8 poly, generate a static lookup table to use with a fast CRC-8
@@ -206,13 +206,15 @@ bool addr_safety_check(CANPacket_t *to_push,
 void generic_rx_checks(bool stock_ecu_detected) {
   // exit controls on rising edge of gas press
   if (gas_pressed && !gas_pressed_prev && !(alternative_experience & ALT_EXP_DISABLE_DISENGAGE_ON_GAS)) {
-    controls_allowed = 1;
+    controls_allowed = 0;
   }
   gas_pressed_prev = gas_pressed;
 
   // exit controls on rising edge of brake press
+  // [BRAKE]
   if (brake_pressed && (!brake_pressed_prev || vehicle_moving)) {
-    controls_allowed = 0;
+    controls_allowed = 1;
+    //controls_allowed = 0;
   }
   brake_pressed_prev = brake_pressed;
 
@@ -239,26 +241,28 @@ typedef struct {
 
 const safety_hook_config safety_hook_registry[] = {
   {SAFETY_SILENT, &nooutput_hooks},
-  {SAFETY_HONDA_NIDEC, &honda_nidec_hooks},
-  {SAFETY_TOYOTA, &toyota_hooks},
+  //{SAFETY_HONDA_NIDEC, &honda_nidec_hooks},
+  //{SAFETY_TOYOTA, &toyota_hooks},
   {SAFETY_ELM327, &elm327_hooks},
   {SAFETY_GM, &gm_hooks},
-  {SAFETY_HONDA_BOSCH, &honda_bosch_hooks},
-  {SAFETY_HYUNDAI, &hyundai_hooks},
+  /*{SAFETY_HONDA_BOSCH, &honda_bosch_hooks},
   {SAFETY_CHRYSLER, &chrysler_hooks},
   {SAFETY_SUBARU, &subaru_hooks},
   {SAFETY_VOLKSWAGEN_MQB, &volkswagen_mqb_hooks},
   {SAFETY_NISSAN, &nissan_hooks},
-  {SAFETY_NOOUTPUT, &nooutput_hooks},
-  {SAFETY_HYUNDAI_LEGACY, &hyundai_legacy_hooks},
   {SAFETY_MAZDA, &mazda_hooks},
   {SAFETY_BODY, &body_hooks},
+  {SAFETY_HYUNDAI_LEGACY, &hyundai_legacy_hooks},
+  {SAFETY_MAZDA, &mazda_hooks},
+  {SAFETY_HYUNDAI_COMMUNITY, &hyundai_community_hooks},
+  */
+  {SAFETY_NOOUTPUT, &nooutput_hooks},
 #ifdef ALLOW_DEBUG
-  {SAFETY_TESLA, &tesla_hooks},
-  {SAFETY_SUBARU_LEGACY, &subaru_legacy_hooks},
-  {SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
+  //{SAFETY_TESLA, &tesla_hooks},
+  //{SAFETY_SUBARU_LEGACY, &subaru_legacy_hooks},
+  //{SAFETY_VOLKSWAGEN_PQ, &volkswagen_pq_hooks},
   {SAFETY_ALLOUTPUT, &alloutput_hooks},
-  {SAFETY_FORD, &ford_hooks},
+  //{SAFETY_FORD, &ford_hooks},
 #endif
 };
 
@@ -363,12 +367,14 @@ bool dist_to_meas_check(int val, int val_last, struct sample_t *val_meas,
 
 // check that commanded value isn't fighting against driver
 bool driver_limit_check(int val, int val_last, struct sample_t *val_driver,
-  const int MAX_VAL, const int MAX_RATE_UP, const int MAX_RATE_DOWN,
-  const int MAX_ALLOWANCE, const int DRIVER_FACTOR) {
+                        const int MAX_VAL, const int MAX_RATE_UP, const int MAX_RATE_DOWN,
+                        const int MAX_ALLOWANCE, const int DRIVER_FACTOR) {
 
+  // torque delta/rate limits
   int highest_allowed_rl = MAX(val_last, 0) + MAX_RATE_UP;
   int lowest_allowed_rl = MIN(val_last, 0) - MAX_RATE_UP;
 
+  // driver
   int driver_max_limit = MAX_VAL + (MAX_ALLOWANCE + val_driver->max) * DRIVER_FACTOR;
   int driver_min_limit = -MAX_VAL + (-MAX_ALLOWANCE + val_driver->min) * DRIVER_FACTOR;
 

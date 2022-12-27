@@ -107,4 +107,3 @@ VAL_ 271368192 GearShifter 3 "Park" 0 "Drive/Low" ;
 VAL_ 271360000 CruiseControlActive 1 "Active" 0 "Inactive" ;
 VAL_ 276135936 CruiseButtons 6 "Cancel" 5 "Main" 3 "Set" 2 "Resume" 1 "None" ;
 VAL_ 276127744 LKAGapButton 2 "???" 1 "??" 0 "None" ;
-

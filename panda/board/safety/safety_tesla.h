@@ -26,8 +26,6 @@ const CanMsg TESLA_PT_TX_MSGS[] = {
 };
 #define TESLA_PT_TX_LEN (sizeof(TESLA_PT_TX_MSGS) / sizeof(TESLA_PT_TX_MSGS[0]))
 
-const int TESLA_NO_ACCEL_VALUE = 375;  // value sent when not requesting acceleration
-
 AddrCheckStruct tesla_addr_checks[] = {
   {.msg = {{0x370, 0, 8, .expected_timestep = 40000U}, { 0 }, { 0 }}},   // EPAS_sysStatus (25Hz)
   {.msg = {{0x108, 0, 8, .expected_timestep = 10000U}, { 0 }, { 0 }}},   // DI_torque1 (100Hz)
@@ -117,8 +115,7 @@ static int tesla_rx_hook(CANPacket_t *to_push) {
 }
 
 
-static int tesla_tx_hook(CANPacket_t *to_send, bool longitudinal_allowed) {
-
+static int tesla_tx_hook(CANPacket_t *to_send) {
   int tx = 1;
   int addr = GET_ADDR(to_send);
   bool violation = false;
@@ -194,13 +191,6 @@ static int tesla_tx_hook(CANPacket_t *to_send, bool longitudinal_allowed) {
 
       if ((accel_max < TESLA_MIN_ACCEL) || (accel_min < TESLA_MIN_ACCEL)){
         violation = true;
-      }
-
-      // Don't allow longitudinal actuation if controls aren't allowed
-      if (!longitudinal_allowed) {
-        if ((raw_accel_max != TESLA_NO_ACCEL_VALUE) || (raw_accel_min != TESLA_NO_ACCEL_VALUE)) {
-          violation = true;
-        }
       }
     } else {
       violation = true;
