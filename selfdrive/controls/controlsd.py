@@ -742,10 +742,10 @@ class Controls:
     CC = car.CarControl.new_message()
     CC.enabled = self.enabled
     # Check which actuators can be enabled
-    CC.latActive = self.active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
-                     CS.vEgo > self.CP.minSteerSpeed and not CS.standstill \
-                   and abs(CS.steeringAngleDeg) < self.CP.maxSteeringAngleDeg
-    CC.longActive = self.active and not self.events.any(ET.OVERRIDE)
+    #CC.latActive = self.active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
+    #                 CS.vEgo > self.CP.minSteerSpeed and not CS.standstill \
+    #               and abs(CS.steeringAngleDeg) < self.CP.maxSteeringAngleDeg
+    #CC.longActive = self.active and not self.events.any(ET.OVERRIDE)
 
     actuators = CC.actuators
     actuators.longControlState = self.LoC.long_control_state
@@ -755,12 +755,11 @@ class Controls:
 
     # State specific actions
 
-    if not CC.latActive:
+    if not self.active:
       self.LaC.reset()
-    if not CC.longActive:
       self.LoC.reset(v_pid=CS.vEgo)
 
-    if not CS.cruiseState.enabledAcc:
+    if not CS.cruiseState.enabled:
       self.LoC.reset(v_pid=CS.vEgo)
 
     if not self.joystick_mode:
@@ -781,13 +780,11 @@ class Controls:
     else:
       lac_log = log.ControlsState.LateralDebugState.new_message()
       if self.sm.rcv_frame['testJoystick'] > 0:
-        if CC.longActive:
-          actuators.accel = 4.0*clip(self.sm['testJoystick'].axes[0], -1, 1)
+        actuators.accel = 4.0*clip(self.sm['testJoystick'].axes[0], -1, 1)
 
-        if CC.latActive:
-          steer = clip(self.sm['testJoystick'].axes[1], -1, 1)
-          # max angle is 45 for angle-based cars
-          actuators.steer, actuators.steeringAngleDeg = steer, steer * 45.
+        steer = clip(self.sm['testJoystick'].axes[1], -1, 1)
+        # max angle is 45 for angle-based cars
+        actuators.steer, actuators.steeringAngleDeg = steer, steer * 45.
 
         lac_log.active = self.active
         lac_log.steeringAngleDeg = CS.steeringAngleDeg
@@ -872,7 +869,7 @@ class Controls:
 
     recent_blinker = (self.sm.frame - self.last_blinker_frame) * DT_CTRL < 5.0  # 5s blinker cooldown
     ldw_allowed = self.is_ldw_enabled and CS.vEgo > LDW_MIN_SPEED and not recent_blinker \
-                    and not CC.latActive and self.sm['liveCalibration'].calStatus == Calibration.CALIBRATED
+                  and not self.active and self.sm['liveCalibration'].calStatus == Calibration.CALIBRATED
 
     model_v2 = self.sm['modelV2']
     desire_prediction = model_v2.meta.desirePrediction
